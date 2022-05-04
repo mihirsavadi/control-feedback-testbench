@@ -1,0 +1,29 @@
+In order to update the weights of the network, a complete forward pass from inputs to error needs to be calculated. The
+eror is a function of the plant output and the reference input (as well as the objective function that we designed to
+quantify quality of damping). The reference input is treated as a constant, but in the real world the plant is a black
+box, who's function description we do not know. Thus, in order to achieve a complete forward pass some function
+approximation to the behavior of the plant must be achieved, thus perhaps warranting that an additional NN be trained
+first that replicates the behavior of the plant 1:1. By having this plant-proxy NN, we can then have a clearly defined
+function that we can calculate our complete forward pass chain of derivatives that we will use to calculate our
+gradients, and thus our wieght updates for the NN that is our controller. Once this is achieved, we can then technically
+do one round of weight updates at every pre-determined interval of time steps (because the objective function is a sum
+of time data), where the loss function is given by our objective function, our total chain derivative expression is
+known, and a gradient vector can be calculated to update our weights -- this way a 'bank of data' would not be required,
+and the ML algorithm would be unsupervised. This approach would have the additional task of having to design a way to
+achieve a well performing NN plant proxy first, which is in-itself another task. If a plant-proxy NN was developed, when
+applied in a real time application the following steps can be taken to achieve self tuning: a plant-proxy NN with low
+error is developed while the system is running with a shitty PID controller, then in the background the plant-proxy NN
+is used with a controller NN to train the NN until good damping is achieved, then the shitty PID controller is replaced
+with the NN controller. The first step then in devising this approach would be to test and figure out how to generate
+this plant-proxy NN using FOPDT first, then work on the other steps. 
+
+DO THE THING DESCRIBED BELOW FIRSTT THEN WORK ON USING THIS MODEL TO CALCULATE To train the plant-proxy NN we could
+create a simple feed forward network (no RNN) and run it in parallel to the actual plant (in our case just use FOPDT)
+and calculate an error which we will accumulate/average over time over a sample input sequence, run 1 round of backprop
+and update weights, then run through the sample input sequence again (which should be randomized), then repeat until the
+error is super low. Note that this is direct input to a plant and no PID controller.
+
+Alternatively, we must also devise some kind of method that does not require knowledge of the plant, i.e. there is no
+model for the plant. This would require some sort of supervised or psuedo-supervised learning method if we decide to
+somehow label data in real time, or we could just employ a reinforcement learning strategy (which is neither supervised
+nor unsupervised but rather a kind of hybrid) (see https://tus 21 

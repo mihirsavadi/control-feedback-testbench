@@ -1,0 +1,345 @@
+% Mihir Savadi | 27-Apr-2022 
+
+% : add github links as footnotes to all relevant places especially in section 4 and 5.
+
+% TODO: CTRL-F all TODOs in document and complete
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{cvpr}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+% Include other packages here, before hyperref.
+\usepackage[ type={CC}, modifier={by-nc-sa}, version={4.0}, ]{doclicense} % for licensing
+
+\newcommand*\diff{\mathop{}\!\mathrm{d}} % helps makes typesetting calculus notation easier
+\newcommand*\Diff[1]{\mathop{}\!\mathrm{d^#1}} % same as above but anything right after is a superscript
+
+% If you comment hyperref and then uncomment it, you should delete egpaper.aux before re-running latex.  (Or just hit
+% 'q' on the first latex run, let it finish, and you should be clear).
+\usepackage[breaklinks=true,bookmarks=false]{hyperref}
+
+\cvprfinalcopy % *** Uncomment this line for the final submission
+
+\def\cvprPaperID{****} % *** Enter the CVPR Paper ID here
+\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready \ifcvprfinal\pagestyle{empty}\fi
+\setcounter{page}{1}
+\begin{document}
+
+    \title{A Neural-Network Based Real-Time SISO Controller:\\Real-time Convergent Feedback Loop (RTCFL)}
+
+    \author{Mihir Savadi\\
+    Bradley Department of Electrical and Computer Engineering\\
+    Virginia Tech\\ \today\\
+    {\tt\small mihirsavadi1@vt.edu} }
+
+    \maketitle
+    \thispagestyle{empty}
+
+    \begin{abstract} 
+        PID control feedback loops are truly ubiquitous amongst a wide variety of controls and automation processes in
+        the modern world. However, before being released, in order to achieve adequate performance, they require manual
+        tuning by a human with domain specific knowledge. This paper proposes the Real-Time Convergent Feedback Loop
+        (RTCFL) -- a generally applicable approach that converges upon good control performance of any system over time
+        without human input, whilst being risk-averse enough to be trained online and in real-time. In addition, the
+        `Control-Feedback Testbench' -- a software environment for simulation of control-feedback loops -- is showcased.
+        % TODO include CODEBASE github link
+    \end{abstract}
+    \tableofcontents
+
+    \section{Introduction} \label{intro}
+
+        PID (potential, integral, derivative) control loops are ubiquitous in our world today -- it is the de-facto
+        control mechanism behind ovens, toasters, home or auto HVACs, cruise controls, auto pilots, attitude control in
+        drones, and various industrial processes. Its popularity is due to its simplicity, reliability, and
+        interpretability -- it has been commonplace in industry for several decades. One drawback of the PID control
+        mechanism is that the parameters that govern them require manual human tuning via trial and error. In many
+        applications this may be inconvenient or costly. This paper proposes an approach that, for any system (or plant)
+        thrown under its purview, can automatically converge upon equivalent behavior of an ideally tuned PID control
+        loop (i.e. achieve perfect damping\footnote{\url{https://en.wikipedia.org/wiki/Damping} \label{wikidamp}}),
+        given real-time data fed to it from the system/plant it is controlling, and no human input. The architecture of
+        this approach will be referred to as the Real-Time Convergent Feedback Loop (RTCFL).
+
+        For those unfamiliar, the basics of PID controller's will be outlined -- they are remarkably simple. Motivations
+        for this project will then be explained, before covering the architecture of the software testbench that was
+        built in order to efficiently and scalably facilitate the simulation and testing of any arbitrary
+        controller-plant circuit. Finally, the architecture of the RTCFL will be discussed and its performance
+        evaluated.
+        % TODO include CODEBASE github link
+
+    \section{PID Controllers Explained} \label{pidexplained}
+
+        Say we had an oven that we wanted to control the temperature of. The intended temperature can be set to any
+        value in a given range by a cook, and the actual temperature of the oven would then be influenced by a heating
+        coil within it. This heating coil would be controlled by some electrical circuitry (often times
+        mechanical!\footnote{Bimetallic strips are commonly found controlling car blinkers -- making sure their
+        switching frequency is constant; or the temperature control in mini-fridges.}) that would carefully alter the
+        power of the heating coil such that a steady temperature is maintained. If the oven is already at a steady
+        temperature, and the cook increases the intended temperature, the controller would then be responsible for
+        ramping up power of the coil so that the oven is able to settle at the new temperature quickly, but not
+        overshoot or oscillate around it (i.e. it must ensure a \textit{perfectly damped}\footnotemark[1] response). The
+        inverse of the same logic applies if the cook decreased the temperature instead.
+
+        In this example, our oven is our system that we are concerned about, which we will refer to as the
+        \textbf{plant}. The output characteristic of our plant that we wish to control is the temperature, which varies
+        with time -- we will refer to it as $y(t)$. The input to our plant that our controller control's in order to
+        influence $y(t)$ is the power of the heating coil, which also varies with time -- we will refer to it as $u(t)$.
+        The intended value of $y(t)$ -- as decided by any agent, in our example the cook sets an intended temperature --
+        can also vary with time and will be referred to as $r(t)$. The error between the intended and the actual plant
+        output will be referred to as $e(t)$. Eq~\ref{pideq} defines a PID controller.
+        
+        \begin{equation} \label{pideq}
+            \begin{gathered}
+                u(t) = K_P e(t) + K_I \int_0^t e(\tau) \diff\tau + K_D \frac{\diff e(t)}{\diff t} \\
+                \text{where } e(t) = r(t) - y(t)
+            \end{gathered}
+        \end{equation}
+        
+        In Section~\ref{intro} we mentioned how PID controllers have parameters that require manual tuning -- these are
+        $K_P$ (called the potential), $K_I$ (called the integral), and $K_D$ (called the derivative), which can be seen
+        in Eq~\ref{pideq}. Figure~\ref{pidblock} is a block diagram representation of Eq~\ref{pideq}, which should help
+        illustrate the real-time nature of this type of system. It can be observed that PID controllers are Single-Input
+        Single-Output systems (SISO).
+        
+        \begin{figure}[h]
+            \includegraphics[width=\linewidth]{./figures/pidBlock.jpg}
+            \centering
+            \caption{Block diagram of a PID controller.\cite{wikipediaPIDdiagram}}
+            \label{pidblock}
+        \end{figure}
+
+        Considering that we will be operating in discrete time due to the digital nature of our computational platforms,
+        Eq~\ref{pideq_discrete} below is the `digital' version of Eq~\ref{pideq}.
+        
+        \begin{equation} \label{pideq_discrete}
+            \begin{gathered}
+                u[t] = K_P e[t] + K_I \sum_{i=0}^n e[t-i] + K_D \left(e[t]-e[t-1]\right) \\
+                \text{where } e[t] = r[t] - y[t], \text{and $n \geq 0$}
+            \end{gathered}
+        \end{equation}
+
+    \section{Motivation} \label{motivation}
+        
+        In certain situations, relying on PID control systems to achieve control stability is impractical. A common
+        example would be when one-off systems, that aren't massed produced and don't have R\&D time before mass
+        production, need to be tuned. For example, whenever an amateur racing drone pilot builds a new custom drone with
+        an off-the-shelf flight controller, they then assume the burden of tuning the PID parameters that govern their
+        drone's flight characteristics. This involves flying around, observing flight behavior, and tuning iteratively
+        via trial-and-error -- this is clearly cumbersome and can even lead to situations that may damage this one-off
+        drone. Modern flight control software comes with auto-tuning features, but these are mostly deterministic and
+        perform poorly.
+
+        Another example would be DIY reflow ovens. When hobbyists or independent printed circuit board designers want to
+        build large complex boards or boards with several hard-to-hand-solder surface mount devices, they often seek the
+        refuge of `reflow-ovens'. The reflow oven process involves a PCB with components placed onto their footprints
+        with unsoldered `solder paste' in between. This PCB is then placed into a reflow oven, which controls the
+        temperature in its chamber to follow a very specific temperature-time curve in order for the solder paste to
+        melt and create sound solder joints as per the manufacturers specifications. Often times hobbyists modify
+        toaster ovens into reflow ovens (which are very popular and work remarkably well) by swapping out existing cheap
+        mechanical controls with their own programmed PID controllers, which they then have to tune. If instead they
+        could use an auto-tuning `adaptive' controller, it would make the conversion process of any randomly chosen
+        toaster oven a lot easier.
+
+        Similar arguments from the examples above can be used to justify the benefits of such an `adaptive' controller
+        in various industrial applications. As such, many efforts have already been made and are currently even being
+        used in deep industry (see references), however many remain seemingly proprietary. The RTCFL approach (detailed
+        in Section~\ref{RTCFLexpained}) is not one that has been explicitly observed yet in existing literature.
+        
+    \section{Control-Feedback Testbench Architecture} \label{tbarch}
+
+        In order to efficiently build, analyze, and maintain a variety of control-feedback circuit designs without
+        compromising design flexibility and granularity, the use of a modular `testbench' environment/platform was
+        imperative. Such a testbench, simply referred to as the `Control-Feedback Testbench', was built as such to
+        facilitate the exploration of the RTCFL proposed in this paper. Hopefully, by the end of this section the reader
+        will recognize it's utility beyond just the scope of this paper.
+
+        The testbench implemented is fundamentally modular, employing object orientated design with heavy use of both
+        inheritance (to enforce inter-class communication consistency without compromising modularity) and composition.
+        At its core, the testbench is based on the concept of `actors' whereby each element in any given circuit (e.g.
+        in Figure~\ref{pidblock} or \ref{rtcflcircuit} for example) is treated as a black box, or an actor, whose basic
+        inputs and outputs are standardized by an abstract actor base class, and whose internal calculations are
+        abstracted away. Actors can be controllers, plants, or any other influencing element of a circuit. 
+        
+        Actor objects are then instantiated inside a circuit class, which contain standardized inputs and outputs
+        themselves, and abstract away the interconnections (whether chronological or parallel) between whatever actors
+        may be present in said particular circuit. These standardizations are again enforced by an abstract circuit base
+        class. Circuit classes contain a single function to update actor outputs according to its defined
+        interconnections for each time-step, as well as store historical data for each `wire' in the circuit.
+        
+        Finally, a scheduler class is what the user interacts with in order to utilize the testbench -- it contains an
+        instance of a particular circuit class, whose parameters are determined on initialization of a scheduler object;
+        it provides a function to get inputs into the circuit, either by time-step by time-step polling or by parsing an
+        external text file; it provides a function to probe the circuit to get information on its stored current and
+        historical data; and it provides a function to generate a convenient plot to quickly visualize circuit behavior,
+        e.g. Figure~\ref{controllertboutputplot}.
+        
+        \begin{figure}[h]
+            \includegraphics[width=\linewidth]{./figures/output_plot_2022Apr25221020.jpg}
+            \centering
+            \caption{Example output plot generated by the Control-Feedback Testbench for a simple PID controller + FOPDT
+                plant, where the PID controller is not well tuned -- the control-feedback loop is under damped. Refer to
+                fig~\ref{pidblock} for plot label references.}
+            \label{controllertboutputplot}
+        \end{figure}
+
+        The user can create arbitrary actor classes (controllers, plants, etc.) and circuit classes, which will function
+        predictably with the aforementioned scheduler class, as long as the respective abstract base classes are adhered
+        to. Thus, a user can use the scheduler class of this testbench to automate testing and analysis of a variety of
+        controllers, plants, and circuits, in an arbitrarily simulated real-time environment.
+
+        % TODO talk about where codebase can be found -- github link, and the RTCFL actors use pytorch.
+
+    \section{The RTCFL Approach} \label{RTCFLexpained}
+
+        In order to understand the RTCFL approach, the interconnects between each actor in the circuit shown in
+        Figure~\ref{rtcflcircuit} must first be studied. As is almost immediately obvious from
+        Figure~\ref{rtcflcircuit}, the RTCFL is model-based. Section~\ref{RTCFLarch} walks through the RTCFL approach
+        step-by-step with reference to the circuit in Figure~\ref{rtcflcircuit}, and Section~\ref{RTCFLtesting}
+        evaluates its performance.
+
+        \begin{figure}[h]
+            \includegraphics[width=\linewidth]{./Figures/rtcfl-circuit.jpg}
+            \centering
+            \caption{RTCFL circuit diagram. Each square box represents an actor: plant\textsubscript{bb} is the original
+                black-box plant that plant\textsubscript{NN} seeks to emulate; controller\textsubscript{NN} is the NN
+                that ultimately needs to be trained to achieve optimal plant control. Each actor can either be `dormant'
+                or `active' from the point of view of the circuit. The NN based actors handle and switch between
+                `learning' and `inference' modes within themselves. The black circle labelled `SW' acts as a switch
+                redirecting either the \textcolor{blue}{$r[t]$ vector on its $a$ channel} or the \textcolor{teal}{$u[t]$
+                vector on its $b$ channel} into both the plants. The \textcolor{blue}{$r[t]$}, \textcolor{teal}{$u[t]$},
+                \textcolor{red}{$y[t]$} vectors follow the convention shown in Fig~\ref{pidblock}. The black dotted
+                vectors indicate objective function output values used to train their respective NN's via gradient
+                descent.}
+            \label{rtcflcircuit}
+        \end{figure}
+
+        \subsection{High Level Architecture} \label{RTCFLarch}
+
+            Refer to the description of Figure~\ref{rtcflcircuit} for a basic explanation of the function of each
+            element in the circuit shown. The steps below will outline the series of operations within the circuit that
+            defines the RTCFL approach. Note that $plant_{NN}$ exists to enable training of $controller_{NN}$ in later
+            steps of the RTCFL approach via backpropagation, by providing a known function through which the derivative
+            of the loss function with respect to the parameters of $controller_{NN}$ can be calculated -- this would not
+            be possible with the `black box' that is $plant_{bb}$, where it's inner function is unknown. Just for the
+            sake of simulation testing $plant_{bb}$ is initialized as an arbitrary FOPDT or SOPDT (first or second order
+            plus dead time) model. %TODO, make a note that RNN's werent used for simplicity of training
+
+            \textbf{Step 1}\\
+            $SW$ is set to pass its $a$ signal and block its $b$ signal. $controller_{NN}$ (initialized with weights
+            resembling that of a generally applicable but poor performing PID controller) is disabled, $plant_{bb}$ and
+            $plant_{NN}$ (initialized with random weights) are enabled. $plant_{bb}$ has a scalar input and output.
+            $plant_{NN}$ has a scalar output, a variable number of hidden layers (for the sake of testing), and 1
+            dimensional input layer resembling $\{r[t], r[t-1], r[t-2], ...,r[t-n]\}$ where $n$ determines the size of
+            the layer and is left as a variable (again for the sake of testing). The learning rates for both the NN's in
+            the circuit are also left as variables.
+
+            $r[t]$ signals are chosen with enough temporal variation to encapsulate what is typical of whatever the
+            chosen application space is. These are then passed concurrently into both plants, whereby $plant_{bb}$'s
+            output is treated as a label, against which $plant_{NN}$'s output is used to calculate a loss value --
+            $loss_{plnt}$. 
+            
+            At every $k\;|\;k\geq 1$ time-steps, an internal data base is appended to with $y[t]$ and the aforementioned
+            label (that is $plant_{bb}$'s output). At every $l\;|\;l=kp, p\geq 1, p\in\mathbb{Z}$ time-steps: the
+            average $loss_{plnt}$ is calculated from the data base, which $plant_{NN}$ then uses to undergo a round of
+            gradient descent and update its parameters; and the database is reset to be empty. This is repeated until
+            $loss_{plnt}$ reaches a minimum threshold value, $minloss_{plnt}$ (left as a variable), after which we can
+            move on to step 2.
+
+            \textbf{Step 2}\\
+            $SW$ now blocks its $a$ signal and passes its $b$ signal. $plant_{bb}$ is disabled, $plant_{NN}$ and
+            $controller_{NN}$ are enabled. $controller_{NN}$ has a scalar output, a variable number of hidden layers
+            (for the sake of testing), and a 1 dimensional input layer resembling $\{r[t], r[t-1], r[t-2], ..., r[t-n],
+            y[t], y[t-1], y[t-2], ..., y[t-n]\}$ where $n$ determines the size of the layer and is left as a variable.
+            
+            Ideally, $controller_{NN}$ is initiated with pre-trained weights such that it emulates a safe/generally
+            applicable but poorly performing PID controller -- this allows the benefit of being able to train and
+            optimize $controller_{NN}$'s weights online and in real-time without risk of throwing the plant out of its
+            safety margins (which would be the case initially with random weights). The possibility of this allows for a
+            room to avert plant-hazard risks in real-life applications.
+
+            The objective function described in Eq~\ref{objfunc} represents in more detail the loss function shown in
+            $loss_{ctrlr}$ from Figure~\ref{rtcflcircuit}. From Figure~\ref{pidblock} we know that $e[t]=r[t]-y[t]$, so
+            $loss_{ctrlr}$ is penalizes for either under or over damping, and is the lowest at perfect damping. It can
+            be seen that the $loss_{ctrlr}$ function is just a regular mean squared error, which is a convenience the
+            RTCFL can enjoy. 
+            
+            At every $k\;|\;k\geq 1$ time-steps, an internal database is appended to with $y[t]$ and the associated
+            $r[t]$. At every $l\;|\;l=kp, p\geq 1, p\in\mathbb{Z}$ time-steps: the average $loss_{ctrlr}$ is calculated
+            from the data base, which $controller_{NN}$ then uses to undergo a round of gradient descent and update its
+            parameters; and the database is reset to be empty. This is repeated until $loss_{ctrlr}$ reaches a minimum
+            threshold value, $minloss_{ctrlr}$, after which our RTCFL will have reached optimal performance!
+
+            \begin{equation} \label{objfunc}
+                \begin{gathered}
+                    loss_{ctrlr} = \frac{1}{z+1} \sum_{i=0}^z \left(r[t-i]-y[t-i]\right)^2 \\
+                    \text{where } z\geq n
+                \end{gathered}
+            \end{equation}
+
+            \textbf{Step 3 (optional)}\\
+            The benefits of the RTCFL can be especially be exploited if we consider that $plant_{NN}$ can be continually
+            optimized in parallel to the function of $controller_{NN}$ (which can also continually undergo training in
+            parallel to inference through a proxy network), which would be valuable in environments that may change with
+            time such that the fundamental dynamics of a plant may change with it too, e.g. an aircraft passing through
+            different layers of altitude and even past atmospheric conditions into space, where fluctuations in air
+            pressure, temperature, and even weather may significantly alter flight dynamics in unpredictable non-linear
+            ways. In a nutshell, the multi-path nature and repeated computational `blocks' of the RTCFL circuit allows
+            significant room for parallel computation, dynamic network training, and even hardware acceleration at the
+            RTCFL system level (power-performance-area optimization via FPGA or custom silicon implementations), which
+            can be exploited depending on the application.
+
+        \subsection{Testing Results and Evaluations} \label{RTCFLtesting}
+
+            % note how everything was written in python make notes of potential improvements like using RNN's instead of
+            %the 1D timeseries inputs etc, and anticipated problems with this vanilla dnn approach. 
+            
+            %talk about various input test files and the whole car data thing (for natural inputs), and the scaling form
+            %-100 t0 100 to mirror 'power'. 
+            
+            % see the piazza post for example report information. talk about reporducibility and stuff. maybe make
+            %another 'looking forward' section where you talk about adding other LSTM's etc as actors, and hardware
+            %testing it on physical platforms like motor controllers and stuff.
+            
+            % Potential drawbacks: needs to be in a system with really high sample rates, and also high temporal
+            %variations per unit time in order to capture plant dynamics and converge more generally quicker. so
+            %probably not good for super large high thermal capacity temperature control systems for example -- unless
+            %training is allowed to be done offline in parellel in real time for a long time.
+
+            % the feedforward DNN's performed like shit. trying to do an LSTM or RNN. 
+
+            % better work can be done to train the plant in the future -- inputs when error is stable, then one
+            % distinctive switch -- maybe test this situation. More work to be done.
+
+            % promising but due to lack of time couldnt dial in variables.
+
+            % observations about how the rnn vs dnn loss min's had to be adjusted differently based on the loss
+            % calculation, their magnitudes were very different
+
+            % moral of the story -- way harder than i thought it was
+
+            % comment on how you used the adamW optimizer throughout.
+
+            % also not how it was surprising that cpu ran faster than cuda for both rnn and dnn
+
+            % comment on semi completed RNN circuit: pytorch backprop gradient calc issue cos of recurrent connections.
+            % can see the plant connection alone failing.
+
+            lorum ipsum
+ 
+
+    {\small
+    \bibliographystyle{ieee_fullname}
+    \bibliography{egbib}
+    \nocite{*} % put this here to include all references without having to cite in the text
+    }
+
+    \section*{License}
+
+        \doclicenseThis
+
+\end{document}
