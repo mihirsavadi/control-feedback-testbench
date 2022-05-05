@@ -48,8 +48,7 @@
         (RTCFL) -- a generally applicable approach that converges upon good control performance of any system over time
         without human input, whilst being risk-averse enough to be trained online and in real-time. In addition, the
         `Control-Feedback Testbench' (CFT) -- a software environment for simulation of control-feedback loops -- is
-        showcased.
-        % TODO include CODEBASE github link - reference to github
+        showcased\cite{gitrepo}.
     \end{abstract}
     \tableofcontents
 
@@ -67,11 +66,11 @@
         this approach will be referred to as the Real-Time Convergent Feedback Loop (RTCFL).
 
         For those unfamiliar, the basics of PID controller's will be outlined -- they are remarkably simple. Motivations
-        for this project will then be explained, before covering the architecture of the software testbench that was
-        built in order to efficiently and scalably facilitate the simulation and testing of any arbitrary
-        controller-plant circuit. Finally, the architecture of the RTCFL will be discussed and its performance
-        evaluated.
-        % TODO include CODEBASE github link
+        for this project will then be explained, before covering the architecture of the CFT that was built in order to
+        efficiently and scalably facilitate the simulation and testing of any arbitrary controller-plant circuit.
+        Finally, the architecture of the RTCFL will be discussed and its performance evaluated. 
+        
+        The github repository for this project is located here\cite{gitrepo}.
 
     \section{PID Controllers Explained} \label{pidexplained}
 
@@ -86,13 +85,13 @@
         overshoot or oscillate around it (i.e. it must ensure a \textit{perfectly damped}\footnotemark[1] response). The
         inverse of the same logic applies if the cook decreased the temperature instead.
 
-        In this example, our oven is our system that we are concerned about, which we will refer to as the
+        In this example, our oven is the system that we are concerned about, which we will refer to as the
         \textbf{plant}. The output characteristic of our plant that we wish to control is the temperature, which varies
         with time -- we will refer to it as $y(t)$. The input to our plant that our controller control's in order to
         influence $y(t)$ is the power of the heating coil, which also varies with time -- we will refer to it as $u(t)$.
-        The intended value of $y(t)$ -- as decided by any agent, in our example the cook sets an intended temperature --
-        can also vary with time and will be referred to as $r(t)$. The error between the intended and the actual plant
-        output will be referred to as $e(t)$. Eq~\ref{pideq} defines a PID controller.
+        The intended value of $y(t)$ -- as decided by an external agent, in our example the cook sets an intended
+        temperature -- can also vary with time and will be referred to as $r(t)$. The error between the intended and the
+        actual plant output will be referred to as $e(t)$. Eq~\ref{pideq} defines a PID controller.
         
         \begin{equation} \label{pideq}
             \begin{gathered}
@@ -154,16 +153,16 @@
     \section{Control-Feedback Testbench Architecture} \label{tbarch}
 
         In order to efficiently build, analyze, and maintain a variety of control-feedback circuit designs without
-        compromising design flexibility and granularity, the use of a modular `testbench' environment/platform was
-        imperative. Such a testbench, simply referred to as the `Control-Feedback Testbench' (or CFT), was built as such
-        to facilitate the exploration of the RTCFL proposed in this paper. Hopefully, by the end of this section the
-        reader will recognize it's utility beyond just the scope of this paper.
+        compromising design flexibility and granularity, the use of a modular `testbench' environment/framework was
+        imperative. Such a testbench -- simply referred to as the `Control-Feedback Testbench' (or CFT) -- was built in
+        order to facilitate the exploration of the RTCFL proposed in this paper. Hopefully, by the end of this section
+        the reader will recognize it's utility beyond just the scope of this paper.
 
         The testbench implemented is fundamentally modular, employing object orientated design with heavy use of both
         inheritance (to enforce inter-class communication consistency without compromising modularity) and composition.
-        At its core, the testbench is based on the `actor' paradigm, whereby each element in any given circuit (e.g. in
-        Figure~\ref{pidblock} or \ref{rtcflcircuit} for example) is treated as a black box, or an actor, whose basic
-        inputs and outputs are standardized by an abstract actor base class, and whose internal calculations are
+        At its core, the testbench is based on the `actor model' paradigm, whereby each element in any given circuit
+        (e.g. in Figure~\ref{pidblock} or \ref{rtcflcircuit} for example) is treated as a black box, or an actor, whose
+        basic inputs and outputs are standardized by an abstract actor base class, and whose internal calculations are
         abstracted away. Actors can be controllers, plants, or any other influencing element of a circuit. 
         
         Actor objects are then instantiated inside a circuit class, which contain standardized inputs and outputs
@@ -177,7 +176,7 @@
         it provides a function to get inputs into the circuit, either by time-step by time-step polling or by parsing an
         external text file; it provides a function to probe the circuit to get information on its stored current and
         historical data; and it provides a function to generate a convenient plot to quickly visualize circuit behavior,
-        e.g. Figure~\ref{controllertboutputplot}, ??, ??, ??.
+        e.g. Figures~\ref{controllertboutputplot}, \ref{dnnOut}, \ref{rnnOut}, and \ref{pidOut}.
         
         \begin{figure}[h]
             \includegraphics[width=\linewidth]{./figures/output_plot_2022Apr25221020.jpg}
@@ -193,7 +192,7 @@
         to. Thus, a user can use the scheduler class of this testbench to automate testing and analysis of a variety of
         controllers, plants, and circuits, in an arbitrarily simulated real-time environment.
 
-        % TODO talk about where codebase can be found -- github link, and the RTCFL actors use pytorch.
+        The entire codebase can be found in the github repository located in\cite{gitrepo}.
 
     \section{The RTCFL Approach} \label{RTCFLexpained}
 
@@ -230,11 +229,11 @@
             Just for the sake of simulation testing $plant_{bb}$ is initialized as an arbitrary FOPDT (first order plus
             dead time) model. The RTCFL circuit was tested with $plant_{NN}$ and $controller_{NN}$ being implemented as
             DNN's in one instance (with inputs being a fixed vector of up to [t-n] time series data), and RNN's in
-            another. Their architectures can as such be experimented with without altering overall RTCFL approach -- the
-            CFT enables this flexibility.
+            another. Their architectures can as such be experimented with without altering the overall RTCFL approach --
+            the CFT enables this flexibility.
 
             \textbf{Step 1}\\
-            $SW$ is set to pass its $a$ signal and block its $b$ signal. $controller_{NN}$ is disabled, $plant_{bb}$ and
+            $SW$ is set to pass its $a$ signal and block its $b$ signal. $controller_{NN}$ is disabled; $plant_{bb}$ and
             $plant_{NN}$ (initialized with random weights) are enabled.
 
             $r[t]$ signals are chosen with enough temporal variation to encapsulate what is typical of whatever the
@@ -243,7 +242,7 @@
             $loss_{plnt}$.
 
             As time goes on, an internal data base is appended to with $r[t]$ time series data (with a variable `n'
-            number of time-steps into the past), along with associated $y[t]$ and $label$ (that is $plant_{bb}$'s
+            number of time-steps into the past), along with the associated $y[t]$ and $label$ (that is $plant_{bb}$'s
             output) data. The interval with which this happens is flexible. Then, at another variable-number of time
             steps, this data base is used to aggregate $loss_{plnt}$, which is then backpropagated through
             $controller_{NN}$, after which $controller_{NN}$'s parameters are updated and the database is reset to
@@ -296,20 +295,26 @@
 
             Two implementations of the RTCFL were created with Pytorch -- one where the $NN$ actors we're based on
             DNN's, and another based on RNN's. Different actor classes, circuit classes and test programs utilizing the
-            CFT were built. (TODO FOOTNOTE TO GITHUB HERE FOR EACH) Said classes were built with a high-degree of
-            flexibility in $NN$ architecture and training configuration, which allowed for flexible experimentation.
-            Both implementations used the AdamW optimizer for gradient descent.
+            CFT were
+            built\footnote{\url{https://github.com/mihirsavadi/control-feedback-testbench/blob/master/code/control_feedback_testbench/controllers.py}}\footnote{\url{https://github.com/mihirsavadi/control-feedback-testbench/blob/master/code/control_feedback_testbench/plants.py}}\footnote{\url{https://github.com/mihirsavadi/control-feedback-testbench/blob/master/code/control_feedback_testbench/circuits.py}}.
+            Said classes were built with a high-degree of flexibility in $NN$ architecture and training configuration,
+            which allowed for flexible experimentation. Both implementations used the AdamW optimizer for gradient
+            descent.
 
             It should be noted that due to the real-time nature of the RTCFL, typical training, test, and validation
-            sets are not applicable. Rather, different sequences of $r[t]$ values are used to feed into the circuit in
-            `simulated real-time' via the CFT (LINK TO GITHUB HERE).
+            sets are not applicable. Rather, different sequences of $r[t]$
+            values\footnote{\url{https://github.com/mihirsavadi/control-feedback-testbench/tree/master/code/r_inputs}}
+            are used to feed into the circuit in `simulated real-time' via the CFT.
 
-            The main experiment used a 10-million long random sequence of $r[t]$ values were generated with a script
-            (TODO GITHUB LINK HERE TO SCRIPT and input sequence) that allowed for configuration in step-size and
-            step-width. These inputs were then fed into the aforementioned RNN and DNN RTCFL architectures, along with a
-            vanilla static PID circuit (like in Figure~\ref{pidblock}) for reference. Figures~\ref{dnnOut},
-            \ref{rnnOut}, and \ref{pidOut} show the plots of these experiments, as generated by the CFT, for the
-            RTCFL-DNN, RTCFL-RNN, and static PID circuits respectively.
+            The main experiment used a 10-million long randomized sequence of $r[t]$
+            values\footnote{\url{https://github.com/mihirsavadi/control-feedback-testbench/blob/master/code/r_inputs/randomStep.csv}}
+            which was generated with a
+            script\footnote{\url{https://github.com/mihirsavadi/control-feedback-testbench/blob/master/code/r_inputs/easyTestGenerator.py}}
+            that allowed for configuration of step-size and step-width ranges. These inputs were then fed into the
+            aforementioned RNN and DNN RTCFL architectures, along with a vanilla static PID circuit (like in
+            Figure~\ref{pidblock}) for reference. Figures~\ref{dnnOut}, \ref{rnnOut}, and \ref{pidOut} show the plots of
+            these experiments, as generated by the CFT, for the RTCFL-DNN, RTCFL-RNN, and static PID circuits
+            respectively.
 
             \begin{figure}[h]
                 \includegraphics[width=\linewidth]{figures/output_plot_2022May03175654.jpg}
@@ -339,17 +344,16 @@
             architectures (like LSTM's or Attention and Transformer Networks).
 
             For all the RTCFL's pros, there exists notable cons that require especially tuned networks to handle them.
-            Firstly, the RTCFL would only be able to perform well in systems with really high sample rates, in order to
-            collect enough data to achieve fast enough convergence. With the need for high sample rates, there is also a
-            need for proportionally high temporal variation in input data in order to capture plant dynamics more
-            generally. But with these high sample rates comes the need for more complex architectures and high memory
-            requirements in order to `remember' enough past data to produce well informed outputs. For example, an RTCFL
-            would probably not work in controllers for slow-changing high-thermal-capacity plants like in some
-            over-sized industrial HVAC systems. Ultimately, these issues are a result of RTCFL's real-time nature and
-            having to work with sparsely available data.
+            Firstly, the RTCFL would only be able to perform well in systems with high sample rates, in order to collect
+            enough data to achieve fast enough convergence. With the need for high sample rates, there is also a need
+            for proportionally high temporal variation in input data in order to capture plant dynamics more as
+            generally as possible. But with these high sample rates comes the need for more complex architectures and
+            high memory requirements in order to `remember' enough past data to produce well informed outputs. For
+            example, an RTCFL would probably not work in controllers for slow-changing high-thermal-capacity plants like
+            in some over-sized industrial HVAC systems. Ultimately, these issues are a result of RTCFL's real-time
+            nature and having to work with sparsely available data.
 
-            Please see github here and here and here.
-            % link github repository and quick rundown of where to find things.
+            Please see github repository located here\cite{gitrepo}.
  
 
     {\small
